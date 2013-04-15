@@ -285,7 +285,7 @@ if not loaded:
                 ucor=rho2d(ucor)
                 ucor=cut_var(ucor,lims)
                 vcor=ncdiags.variables['v_cor'][it,kchoice,:,:]
-                vcor=rho2d(vcor)
+                vcor=rho2d(vcor,naxis=0)
                 vcor=cut_var(vcor,lims)
             else:
                 print("let's not do that right now!!!")
