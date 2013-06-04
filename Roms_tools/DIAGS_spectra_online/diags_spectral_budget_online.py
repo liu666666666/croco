@@ -8,28 +8,45 @@ import numpy as np
 import pickle as pk
 import pylab as p
 
-from utilities import gridinfo,rho2d,cut_var,partialx,partialy,tukeywin,integ_fft2d
+from utilities import gridinfo,rho2d,cut_var,partialx,partialy,tukeywin,integ_fft2d,integ_fft1d
     
 import pycomodo as pc
+import pycomodo.operators.simple_ops as op
+import pycomodo.util.variables as puv
 
+
+''' Setting main parameters of for the calculation:
+    * if mean =1 , we remove the mean of eaxh variable and use the fluctuation instead u'=u-ubar 
+    * window =1 we use windowing (useful for non-periodic solution)
+    * cff_tukey=1 if windowing is used uses the Tukey method
+    * salinity=1 if we uses salinity in density calculation
+    * wind=1 if wind forcing is used'''
 mmean=0
 window=0
 cff_tukey=1
 salinity=0
 wind=0
 
-root='/data/models/JET/5K_ISO/END/'
-model='jet'
-dx=5.e3
 
-kchoicelist=[8]
+''' Path of the output files, resolution, box set, vertical level list, iterations... '''
+resol='20K'
+dx=20.e3
+
+root='/data/models/JET/Last3Months/'+resol
+model='jet_last3months'
+
+
+kchoicelist=range(30)[8:]#[8]
+#kchoicelist=[8]
 lims=[1,100,1,400]
+#it1=639
+it1=1
+it2=92
 
-it1=162
-it2=162
 
+'''physical constants and plotting parameters'''
 g=9.81
-rho0=1000
+rho0=1024
 cff_scale=1.e7
 xmin=0.9e-5
 xmax=1.e-3
@@ -41,9 +58,18 @@ dia=-9
 
 #loadmode = input('loadmode? (0/no 1/yes) ')
 
+
+#
 loaded=False
 save=True
-filename='essai3.pck'
+#
+#loaded=True
+#save=False
+
+filename=resol+'JET.pck'
+
+
+''' Different terms are already computed, online=1, or needs to be calculated'''
 online_T=1
 online_P=1
 online_Cor=1
@@ -60,7 +86,8 @@ if np.mod(lims[3]-lims[2],2)==1 :
     lims[2]=lims[2]-1
 
 # Lateral grid
-
+xlim=np.arange(lims[0],lims[1])
+ylim=np.arange(lims[2],lims[3])
 #overload grid_info function
 
 if not loaded:
@@ -68,9 +95,9 @@ if not loaded:
     grd=gridinfo()
     grd.setId(model)
     
-    #nc=pc.Archive(grd.grdfile)
+    nc=pc.Archive(grd.grdfile)
     
-    nc=pc.netcdf.netcdf_file(grd.grdfile)
+    #nc=pc.netcdf.netcdf_file(grd.grdfile)
     
     
     pm=nc.variables.get('pm')
@@ -86,15 +113,19 @@ if not loaded:
     
     
     
-    pm=cut_var(pm.data.transpose(),lims)
-    pn=cut_var(pn.data.transpose(),lims)
-    #lon=grd.lonrlon=cut_var(lon,lims)
-    #lat=grd.latrlat=cut_var(lat,lims)
-    f=cut_var(f.data.transpose(),lims)
+    #    pm=cut_var(pm.data.transpose(),lims)
+    #    pn=cut_var(pn.data.transpose(),lims)
+    #    #lon=grd.lonrlon=cut_var(lon,lims)
+    #    #lat=grd.latrlat=cut_var(lat,lims)
+    #    f=cut_var(f.data.transpose(),lims)
     # Vertical grid
+    pm=pm[ylim,xlim].T
+    pn=pn[ylim,xlim].T
+    f=f[ylim,xlim].T
+    
     
     #h=cut_var(h0.data,lims)
-    h=h0.data[0,0]
+    h=h0[0,0]
     
     from Preprocessing_tools import zlevs
     
@@ -104,7 +135,7 @@ if not loaded:
     kk=kchoicelist
     ll=len(kk)
     dz=np.zeros(zw.shape)
-    dz[1:N-1]=zw[2:N]-zw[1:N-1]
+    dz[1:]=zw[1:]-zw[:-1]
     dz[0]=dz[1]
     dz_klist=dz[kk]
     dz=dz[kchoice:N]
@@ -115,8 +146,8 @@ if not loaded:
     
     
     
-    zr=zlevs.zlevs(h0.data,0,thetas,thetab,hc,N,'r')
-    zw=zlevs.zlevs(h0.data,0,thetas,thetab,hc,N,'w')
+    zr=zlevs.zlevs(h0[:],0,thetas,thetab,hc,N,'r')
+    zw=zlevs.zlevs(h0[:],0,thetas,thetab,hc,N,'w')
     
     zr=zr.transpose((1,2,0))
     zw=zw.transpose((1,2,0))
@@ -136,9 +167,11 @@ if not loaded:
     diagfilename =root+model+'_diaM.nc'
     
     print('reading netcdf file: %s',historyfilename)    
-    nchis=pyroms.io.Dataset(historyfilename)
+    #nchis=pyroms.io.Dataset(historyfilename)
     print('reading netcdf file: %s',diagfilename) 
     ncdiags=pyroms.io.Dataset(diagfilename)
+    nchis=pc.Archive(historyfilename)
+    #ncdiags=pc.Archive(diagfilename)
     
     
     tmpamp0=np.array(0)
@@ -155,16 +188,23 @@ if not loaded:
 
    
     ik=-1
+
+    U=nchis.variables['u']
+    V=nchis.variables['v']
+         
+    U=op.interpolate(U,'T')
+    V=op.interpolate(V,'T')    
+    
     for kchoice in kchoicelist:
         ik=ik+1
         #
         # TEMPORAL LOOP ================================
         #
         for it in range(it1-1,it2):
-            if his==-10:
-                ithis=it+1
-            else:
-                ithis=it
+#            if his==-10:
+#                ithis=it+1
+#            else:
+            ithis=it
             
             print('Treating rec #d',it)
             timehis=nchis.variables['scrum_time'][ithis]
@@ -179,17 +219,21 @@ if not loaded:
             
             #### CENTERED DIFFERENCE EVALUATION OF THE NL TERMS ####
             #### computed as if in the rhs
-            u=nchis.variables['u'][ithis,kchoice,:,:]
-            #u=rnt_loadvar_partialz(ctlhis,ithis,'u',kchoice,kchoice) # v is 3d
-            v=nchis.variables['v'][ithis,kchoice,:,:]
-            u2rho=rho2d(u)
-            u=cut_var(u2rho,lims)
-            v2rho=rho2d(v,naxis=0)
-            v=cut_var(v2rho,lims)
-            print('shape 1 (%d,%d)',u.shape)
-            print('u[0,0] %lf',u[0,0])
-            advu1=-u*partialx(u,pm)-v*partialy(u,pn)
-            advv1=-u*partialx(v,pm)-v*partialy(v,pn)
+#            u=nchis.variables['u'][ithis,kchoice,:,:]
+#            #u=rnt_loadvar_partialz(ctlhis,ithis,'u',kchoice,kchoice) # v is 3d
+#            v=nchis.variables['v'][ithis,kchoice,:,:]
+            
+            ##This is ugly...masked array can't be broadcast? u[iths,kchoice,ylim,xlim]
+            u=U[ithis,kchoice,:ylim[-1]+1,:xlim[-1]+1].T
+            v=V[ithis,kchoice,:ylim[-1]+1,:xlim[-1]+1].T
+#            u2rho=rho2d(u)
+#            u=cut_var(u2rho,lims)
+#            v2rho=rho2d(v,naxis=0)
+#            v=cut_var(v2rho,lims)
+#            print('shape 1 (%d,%d)',u.shape)
+#            print('u[0,0] %lf',u[0,0])
+            #advu1=-u*partialx(u,pm)-v*partialy(u,pn)
+            #advv1=-u*partialx(v,pm)-v*partialy(v,pn)
     
     #### UPSTREAM BIASED NL TERMS ####
     #### computed as if in the rhs (- sign already included).
@@ -204,11 +248,15 @@ if not loaded:
             advv2=advv2+ncdiags.variables['v_yadv'][it,kchoice,:,:]
             advv2=rho2d(advv2,naxis=0)
             advv2=cut_var(advv2,lims)
+            
+            
+            advu1=advu2
+	    advv1=advv2 
     #
     # #### implicit dissipation
     # #### computed as in the rhs
-            dissu=advu2-advu1
-            dissv=advv2-advv1
+            #dissu=advu2-advu1
+            #dissv=advv2-advv1
     #
     # #### explicit dissipation
     # #### computed as if in the rhs (- sign already included).
@@ -365,16 +413,18 @@ if not loaded:
                 e_zdis=0
                 e_cor=0
                 e_res=0
+                e_wb=0
     
                 (L,M)=u.shape # works for non squared grids
-                cff_tukey=0.25
-                wdw1=tukeywin(L,cff_tukey)
-                wdw2=tukeywin(M,cff_tukey)
-                print(wdw1.shape)
-                print(wdw2.shape)
-                wdw=np.zeros((wdw1.shape[0],wdw2.shape[0]))
-                #wdw=np.dot(wdw1.transpose(),wdw2)
-                wdw=wdw1.reshape(wdw1.shape[0],1)*wdw2.reshape(1,wdw2.shape[0])
+                if window==1:
+                    cff_tukey=0.25
+                    wdw1=tukeywin(L,cff_tukey)
+                    wdw2=tukeywin(M,cff_tukey)
+                    print(wdw1.shape)
+                    print(wdw2.shape)
+                    wdw=np.zeros((wdw1.shape[0],wdw2.shape[0]))
+                    #wdw=np.dot(wdw1.transpose(),wdw2)
+                    wdw=wdw1.reshape(wdw1.shape[0],1)*wdw2.reshape(1,wdw2.shape[0])
     
             print('shape 3 (%d,%d)',u.shape)
             
@@ -425,8 +475,8 @@ if not loaded:
             if window==1:
                 u=u*wdw
                 v=v*wdw
-                advu1=advu1*wdw
-                advv1=advv1*wdw
+                #advu1=advu1*wdw
+                #advv1=advv1*wdw
                 advu2=advu2*wdw
                 advv2=advv2*wdw
                 dissu=dissu*wdw
@@ -456,6 +506,7 @@ if not loaded:
             e_zadv=e_zadv+np.mean(u*zadvu+v*zadvv)
             e_zdis=e_zdis+np.mean(u*ukpp+v*vkpp)
             e_cor=e_cor+np.mean(u*ucor+v*vcor)
+            e_wb=e_wb+np.mean(w*b)
             e_res=e_rate-(e_hadv+e_hdpr+e_zadv+e_zdis+e_cor)
     
     #
@@ -476,6 +527,8 @@ if not loaded:
                 tmpamp9=np.zeros((L,M))
                 tmpamp10=np.zeros((L,M))
                 tmpamp22=np.zeros((L,M))
+                tmpamp12=np.zeros(L)
+                tmpamp13=np.zeros(L)
     
     #
             print('shape 5 (%d,%d)',tmpamp0.max())
@@ -484,6 +537,18 @@ if not loaded:
             fcoefv=np.fft.fft2(v)
             tmpamp0=tmpamp0+cff1*np.real(np.conj(fcoefu)*fcoefu+np.conj(fcoefv)*fcoefv)        #  0  kinetic energy
     #
+            for i in range(M):
+                u1D=u[:,i]
+                v1D=v[:,i]
+                fcoefu1D=np.fft.fft(u1D)
+                fcoefv1D=np.fft.fft(v1D)
+                coef=(dz_klist[ik]/(sum(dz_klist)*L**2)).flatten()
+                tmpamp12=tmpamp12+coef*np.real(np.conj(fcoefu1D)*fcoefu1D+np.conj(fcoefv1D)*fcoefv1D) 
+            print('shape tmpamp12 (%d,%d)',tmpamp12.shape)
+            tmpamp12=tmpamp12/M
+            tmpamp13=tmpamp0.mean(axis=1)
+            print('shape tmpamp13 (%d,%d)',tmpamp13.shape)
+            
             fcoeftmpu=np.fft.fft2(advu1)
             fcoeftmpv=np.fft.fft2(advv1)
             tmpamp1=tmpamp1+cff1*np.real(np.conj(fcoefu)*fcoeftmpu+np.conj(fcoefv)*fcoeftmpv)   #  1  C4 horiz advection
@@ -516,8 +581,8 @@ if not loaded:
             fcoeftmpv=np.fft.fft2(resv)
             tmpamp8=tmpamp8+cff1*np.real(np.conj(fcoefu)*fcoeftmpu+np.conj(fcoefv)*fcoeftmpv)   #  8  residual
             
-            fcoeftmpu=np.fft.fft2(b)
-            fcoeftmpv=np.fft.fft2(w)
+            fcoeftmpu=np.fft.fft2(w)
+            fcoeftmpv=np.fft.fft2(b)
             tmpamp9=tmpamp9+cff1*np.real(np.conj(fcoeftmpu)*fcoeftmpv)                        #  9  baroclinic conversion wb
             
             fcoeftmpu=np.fft.fft2(ucor)
@@ -547,6 +612,7 @@ if not loaded:
         print('e_vadv = %lf ',e_zadv)
         print('e_vdif = %lf ',e_zdis)
         print('e_cor  = %lf ',e_cor)
+        print('e_wb =%lf ',e_wb)
         print('e_res  = %lf ',e_res)
         
         print('shape 6 %lf',tmpamp0.sum())
@@ -564,6 +630,9 @@ if not loaded:
         tmpamp8=1./(it2-it1+1)*tmpamp8
         tmpamp9=1./(it2-it1+1)*tmpamp9
         tmpamp10=1./(it2-it1+1)*tmpamp10
+        tmpamp12=1./(it2-it1+1)*tmpamp12
+        tmpamp13=1./(it2-it1+1)*tmpamp13      
+        
     # vertical loop
     print('tmpamp0 %lf',tmpamp0.mean())
     print('tmpamp1 %lf',tmpamp1.mean())
@@ -588,6 +657,8 @@ if not loaded:
     tmpamp8=np.fft.fftshift(tmpamp8)
     tmpamp9=np.fft.fftshift(tmpamp9) 
     tmpamp10=np.fft.fftshift(tmpamp10)
+    tmpamp12=np.fft.fftshift(tmpamp12)
+    tmpamp13=np.fft.fftshift(tmpamp13)
     
     print('tmpamp0 %lf',tmpamp0.mean())
     print('tmpamp1 %lf',tmpamp1.mean())
@@ -601,8 +672,7 @@ if not loaded:
     print('tmpamp8 %lf',tmpamp8.mean())
     print('tmpamp9 %lf',tmpamp9.mean())
     print('tmpamp10 %lf',tmpamp10.mean())
-    
-
+    print('tmpamp12 %lf',tmpamp12.mean())
     #
     ## get 1D spectra
     method=2
@@ -620,6 +690,9 @@ if not loaded:
     [amp9,count,ktmp,dk]=integ_fft2d(tmpamp9,dx)
     [amp10,count,ktmp,dk]=integ_fft2d(tmpamp10,dx)
     
+    
+    #[amp12,count,ktmp,dk]=integ_fft1d(tmpamp12,dx)
+    #[amp13,count,ktmp,dk]=integ_fft1d(tmpamp13,dx)
     #==============================================================================
     # eval(['save SPECTRAL_KE_PK_2d_t' num2str(it1) '_to_t' num2str(it2) '.mat amp0 amp1 amp2 amp3 amp4 amp5 amp6 amp7 amp8 amp9 amp10 ktmp count kchoicelist'])
     #
@@ -638,14 +711,17 @@ if loaded:
 amp11=amp4-(amp2+amp3+amp5+amp6+amp7+amp10)
 istr=0
 print(' amp0 rebuilt = %lf ',sum(amp0[istr:]))
+#print(' amp12 rebuilt = %lf ',sum(amp12[istr:]))
 print('e_rate rebuilt = %lf ',sum(amp4[istr:]))
 print('e_hdif rebuilt = %lf ',sum(amp3[istr:]))
 print('e_hadv rebuilt = %lf ',sum(amp2[istr:]))
+print('e_hadv2 rebuilt = %lf ',sum(amp1[istr:]))
 print('e_pgr  rebuilt = %lf ',sum(amp5[istr:]))
 print('e_vadv rebuilt = %lf ',sum(amp7[istr:]))
 print('e_vdif rebuilt = %lf ',sum(amp6[istr:]))
 print('e_cor  rebuilt = %lf ',sum(amp10[istr:]))
 print('e_res  rebuilt = %lf ',sum(amp11[istr:]))
+print('baroclinic conversion rebuilt = %lf ',sum(amp9[istr:]))
 #
 # #############################################################################
 # #
@@ -662,6 +738,7 @@ dk=ktmp[9]-ktmp[8]
 
 print('u[0,0] %lf',u[0,0])
 K=ktmp[istr:]
+LK=K.shape[0]
 A=[]
 #number1=K[0]
 number1=cff_scale
@@ -671,18 +748,7 @@ expon=-int(np.floor(log10(abs(number1))))
 coef=number1*10.**expon
 print expon,coef
 #cff_scale=10.**4
-fig=p.figure()
-a1=fig.add_subplot(1,1,1)
-a1.plot(K,amp0/dk,'go-',label='snapshot')
 
-a1.plot(K,K**(-2)/cff_scale,'r',label=r'$k^{-2}$')
-a1.plot(K,K**(-5./3)/cff_scale,'b--',label=r'$k^{-5/3}$')
-a1.plot(K,K**(-3)/cff_scale,'c+',label=r'$k^{-3}$')
-a1.set_yscale('log')
-a1.set_xscale('log')
-a1.set_xlabel('Wavenumber k [rad/m]')
-a1.set_title('KE spectrum')
-p.legend()
 
 
 A +=[cff_scale*amp1[istr:]/dk]
@@ -706,6 +772,7 @@ fig=p.figure()
 a=fig.add_subplot(1,1,1)
 a.plot(K,A[2],'b',label='horizontal diffusion')
 a.plot(K,A[1],'g',label='horizontal advection')
+#a.plot(K,A[0],'g-*',label='horizontal advection 2')
 a.plot(K,A[3],'r',label=r'$\frac{\partial{u}}{\partial{t}}$')
 a.plot(K,A[4],'c',label='P')
 #
@@ -713,17 +780,38 @@ a.plot(K,A[4],'c',label='P')
 #p.figure()
 a.plot(K,A[5],'b--',label='vertical diffusion',)
 a.plot(K,A[6],'g--',label='vertical advection')
+#a.plot(K,A[8],'y--',label='buoyancy flux')
 a.plot(K,A[9],'r--',label='Coriolis')
-a.plot(K,A[7],'c--',label='Residual')
-a.plot(K,A[10],'p--',label='Res(spectral)')
+#a.plot(K,A[7],'c--',label='Residual')
+#a.plot(K,A[10],'k-*',label='Res(spectral)')
 #a.set_yscale('log')
 a.set_xscale('log')
 
 
 a.legend()
+pic1name=resol+'budget'
+fig.suptitle(resol+' spectral budget')
+
+fig.savefig(pic1name)
 
 
+fig2=p.figure()
+a2=fig2.add_subplot(1,1,1)
+a2.plot(K,A[7],'c--',label='Residual')
+a2.plot(K,A[10],'k-*',label='Res(spectral)')
+#a.set_yscale('log')
+a2.set_xscale('log')
 
+
+a2.legend()
+
+strexpon=str(expon)
+a2.set_xlabel('k [rad/m]')
+a2.set_ylabel('KE Tendencies [$10^{'+strexpon+'} m^3/s^3$]')
+
+pic2name=resol+'residual'
+fig2.suptitle(resol+' residual')
+fig2.savefig(pic2name)
 # hl2=plot(K,A(6,istr:),K,A(7,istr:),K,A(10,istr:),K,A(8,istr:),K,A(11,istr:))
 # hold on
 # set(hl1,'Linewidth',2)
@@ -736,14 +824,31 @@ a.legend()
 # set(gca,'Yscale','linear','Xscale','log')
 # i#set(gca,'Ylim',[-1 1],'Xlim',[number2 4e-4])
 # set(gca,'Ylim',[ymin ymax],'Xlim',[xmin xmax])
-a.set_xlabel('k [rad/m]')
+fig3=p.figure()
+a3=fig3.add_subplot(1,1,1)
+a3.set_xlabel('k [rad/m]')
 # [coef,expon] =strread(strrep(sprintf('#E',cff_scale),'E','#'),'#f##f')
-strexpon=str(expon)
-a.set_ylabel('KE Tendencies [$10^{'+strexpon+'} m^3/s^3$]')
+
+a3.set_ylabel('KE Tendencies [$10^{'+strexpon+'} m^3/s^3$]')
 #a.set_ylim(ymin,ymax)
-a.set_xlim(xmin,xmax)
+#a3.set_xlim(xmin,xmax)
 #a.set(gca,'Ylim',[ymin ymax],'Xlim',[xmin xmax]);
-p.show()
+pic3name=resol+'slope'
+fig3.suptitle(resol)
+
+a3.plot(K,amp0/dk,'go-',label='snapshot')
+#a3.plot(K,amp12[istr:]/dk,'g*-',label='1D')
+#a3.plot(K,amp13[istr:]/dk,'g+-',label='')
+a3.plot(K,K**(-2)/cff_scale,'r',label=r'$k^{-2}$')
+a3.plot(K,K**(-5./3)/cff_scale,'b--',label=r'$k^{-5/3}$')
+a3.plot(K,K**(-3)/cff_scale,'c+',label=r'$k^{-3}$')
+a3.set_yscale('log')
+a3.set_xscale('log')
+a3.set_xlabel('Wavenumber k [rad/m]')
+a3.set_title('KE spectrum')
+a3.legend()
+fig3.savefig(pic3name)
+#p.show()
 # set(gca,'fontvar.dime',16)
 #
 # hl=line([3e-6 2e-3],[0 0])

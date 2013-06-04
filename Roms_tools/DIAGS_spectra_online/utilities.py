@@ -6,6 +6,7 @@ Created on Wed Feb 20 16:53:58 2013
 """
 
 import numpy as np
+
 class gridinfo:
     '''
     Class redifning the gridinfo structure
@@ -130,6 +131,37 @@ def tukeywin(window_length, alpha=0.5):
 
     return w
 
+def integ_fft1d(tmpamp,dx):
+    L=tmpamp.shape[0]
+    Lh=L/2.
+    cff=2*np.pi/dx
+    i2L=1./L**2
+    a=np.arange(L)
+    kk=a-Lh
+    Kh=i2L*kk**2
+    Kh=cff*np.sqrt(Kh)
+    amp=np.zeros(L/2)
+    ktmp=np.zeros(L/2)
+    count=np.zeros(L/2)
+    dk=np.zeros(L/2)
+    for ind in range(L/2):
+        ktmp[ind]=2*cff/L*(ind+1)
+    #        print('ktmp: %lf',ktmp[ind])
+        II=tmpamp[abs(Kh-ktmp[ind])<cff/L]
+    #        print('II: %d',len(II))
+        #II=find(abs(Kh-ktmp(ind))<cff/(2*Lmin))
+        #[xI,yI]=find(abs(Kh-ktmp(ind))<cff/(2*Lmin))
+    #        print tmpamp[II]
+        amp[ind]=II.sum()
+    #        print('anp: %lf',amp[ind])
+        count[ind]=II.shape[0]
+        dk[ind]=2*cff/L
+    
+    cff=2*dk[:]*ktmp[:]/(ktmp[-1]**2)*sum(count)/count[:]
+    amp=amp*cff;
+    return amp,count,ktmp,dk    
+        
+    
 def integ_fft2d(tmpamp,dx):
     (L,M)=tmpamp.shape    
     Lh=L/2.
