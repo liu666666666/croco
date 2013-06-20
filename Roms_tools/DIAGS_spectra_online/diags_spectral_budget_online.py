@@ -8,39 +8,43 @@ import numpy as np
 import pickle as pk
 import pylab as p
 
-from utilities import gridinfo,rho2d,cut_var,partialx,partialy,tukeywin,integ_fft2d,integ_fft1d
+from utilities import rho2d,cut_var,tukeywin,integ_fft2d,get_zw
     
 import pycomodo as pc
 import pycomodo.operators.simple_ops as op
-import pycomodo.util.variables as puv
+
+#import pycomodo.util.variables as puv
 
 
 ''' Setting main parameters of for the calculation:
-    * if mean =1 , we remove the mean of eaxh variable and use the fluctuation instead u'=u-ubar 
+    * if mean =1 , we remove the mean of each variable and use the fluctuation instead u'=u-ubar 
     * window =1 we use windowing (useful for non-periodic solution)
-    * cff_tukey=1 if windowing is used uses the Tukey method
+    * cff_tukey=1, if windowing is used, uses the Tukey method
     * salinity=1 if we uses salinity in density calculation
     * wind=1 if wind forcing is used'''
+    
 mmean=0
-window=0
+window=1
 cff_tukey=1
 salinity=0
 wind=0
 
 
 ''' Path of the output files, resolution, box set, vertical level list, iterations... '''
-resol='20K'
-dx=20.e3
+resol='5K'
+
+dx=5.e3
 
 root='/data/models/JET/Last3Months/'+resol
 model='jet_last3months'
 
+level=22
 
-kchoicelist=range(30)[8:]#[8]
-#kchoicelist=[8]
+kchoicelist=range(30)[level:]
+
 lims=[1,100,1,400]
-#it1=639
-it1=1
+
+it1=91
 it2=92
 
 
@@ -52,14 +56,11 @@ xmin=0.9e-5
 xmax=1.e-3
 ymin=-1
 ymax=1  # limits for plots
-print_and_keep=0
+
 his=-10
 dia=-9
 
-#loadmode = input('loadmode? (0/no 1/yes) ')
 
-
-#
 loaded=False
 save=True
 #
@@ -88,89 +89,33 @@ if np.mod(lims[3]-lims[2],2)==1 :
 # Lateral grid
 xlim=np.arange(lims[0],lims[1])
 ylim=np.arange(lims[2],lims[3])
+
+
+
 #overload grid_info function
 
 if not loaded:
     
-    grd=gridinfo()
-    grd.setId(model)
+    zw=get_zw('Jet')
+
+    print('Integrating from depth: %lf',zw[kchoice])
     
-    nc=pc.Archive(grd.grdfile)
-    
-    #nc=pc.netcdf.netcdf_file(grd.grdfile)
-    
-    
-    pm=nc.variables.get('pm')
-    pn=nc.variables.get('pn')
-    f=nc.variables.get('f')
-    hc=grd.hc
-    thetas=grd.thetas
-    thetab=grd.thetab
-    N=grd.N
-    method=grd.Method
-    
-    h0=nc.variables.get('h')
-    
-    
-    
-    #    pm=cut_var(pm.data.transpose(),lims)
-    #    pn=cut_var(pn.data.transpose(),lims)
-    #    #lon=grd.lonrlon=cut_var(lon,lims)
-    #    #lat=grd.latrlat=cut_var(lat,lims)
-    #    f=cut_var(f.data.transpose(),lims)
-    # Vertical grid
-    pm=pm[ylim,xlim].T
-    pn=pn[ylim,xlim].T
-    f=f[ylim,xlim].T
-    
-    
-    #h=cut_var(h0.data,lims)
-    h=h0[0,0]
-    
-    from Preprocessing_tools import zlevs
-    
-    zr=zlevs.zlevs(h,0,thetas,thetab,hc,N,'r')
-    zw=zlevs.zlevs(h,0,thetas,thetab,hc,N,'w')
-    
-    kk=kchoicelist
-    ll=len(kk)
     dz=np.zeros(zw.shape)
     dz[1:]=zw[1:]-zw[:-1]
     dz[0]=dz[1]
-    dz_klist=dz[kk]
-    dz=dz[kchoice:N]
+    dz_klist=dz[kchoicelist]
+    dz=dz[kchoicelist]
     #
-    kmin=kchoice-1
-    kmax=min(N,kchoice+1)
-    [Lmin,Lmax,Mmin,Mmax]=lims
-    
-    
-    
-    zr=zlevs.zlevs(h0[:],0,thetas,thetab,hc,N,'r')
-    zw=zlevs.zlevs(h0[:],0,thetas,thetab,hc,N,'w')
-    
-    zr=zr.transpose((1,2,0))
-    zw=zw.transpose((1,2,0))
-    
-    dzw=np.zeros(zw.shape)
-    dzw[:,:,1:-1]=zr[:,:,1:]-zr[:,:,:-1]
-    dzw[:,:,0]=dzw[:,:,1]
-    dzw=dzw[Lmin:Lmax,Mmin:Mmax,kmin:kmax]
-    
-    dzr=np.zeros(zr.shape)
-    dzr[:,:,1:]=zw[:,:,2:]-zw[:,:,1:-1]
-    dzr[:,:,0]=dzr[:,:,1]
-    dzr=dzr[Lmin:Lmax,Mmin:Mmax,kmin:kmax]
-    
-    
+ 
+
     historyfilename=root+model+'_his.nc'
     diagfilename =root+model+'_diaM.nc'
     
-    print('reading netcdf file: %s',historyfilename)    
-    #nchis=pyroms.io.Dataset(historyfilename)
+    print('reading netcdf file: %s',historyfilename)
+    nchis=pc.Archive(historyfilename)
+    
     print('reading netcdf file: %s',diagfilename) 
     ncdiags=pyroms.io.Dataset(diagfilename)
-    nchis=pc.Archive(historyfilename)
     #ncdiags=pc.Archive(diagfilename)
     
     
@@ -217,21 +162,11 @@ if not loaded:
             print('which, in his file, correspond to %lf:', levelhis)
             print('which, in diaM file, correspond to %lf:', leveldiaM)
             
-            #### CENTERED DIFFERENCE EVALUATION OF THE NL TERMS ####
-            #### computed as if in the rhs
-#            u=nchis.variables['u'][ithis,kchoice,:,:]
-#            #u=rnt_loadvar_partialz(ctlhis,ithis,'u',kchoice,kchoice) # v is 3d
-#            v=nchis.variables['v'][ithis,kchoice,:,:]
-            
+                       
             ##This is ugly...masked array can't be broadcast? u[iths,kchoice,ylim,xlim]
             u=U[ithis,kchoice,:ylim[-1]+1,:xlim[-1]+1].T
             v=V[ithis,kchoice,:ylim[-1]+1,:xlim[-1]+1].T
-#            u2rho=rho2d(u)
-#            u=cut_var(u2rho,lims)
-#            v2rho=rho2d(v,naxis=0)
-#            v=cut_var(v2rho,lims)
-#            print('shape 1 (%d,%d)',u.shape)
-#            print('u[0,0] %lf',u[0,0])
+
             #advu1=-u*partialx(u,pm)-v*partialy(u,pn)
             #advv1=-u*partialx(v,pm)-v*partialy(v,pn)
     
@@ -251,7 +186,7 @@ if not loaded:
             
             
             advu1=advu2
-	    advv1=advv2 
+            advv1=advv2 
     #
     # #### implicit dissipation
     # #### computed as in the rhs
@@ -260,6 +195,7 @@ if not loaded:
     #
     # #### explicit dissipation
     # #### computed as if in the rhs (- sign already included).
+            
             dissu2=ncdiags.variables['u_hmix'][it,kchoice,:,:]
             dissu2=rho2d(dissu2)
             dissu2=cut_var(dissu2,lims)
@@ -273,7 +209,7 @@ if not loaded:
     #
     # #==============================================================================
             if wind:
-                print("let's not do that right now!!!")
+                print("let's not do WIND right now!!!")
                 exit
     
     #
@@ -282,13 +218,12 @@ if not loaded:
                 dudt=ncdiags.variables['u_rate'][it,kchoice,:,:]
                 dudt=rho2d(dudt)
                 dudt=cut_var(dudt,lims)
-                dudt2=dudt
                 dvdt=ncdiags.variables['v_rate'][it,kchoice,:,:]
                 dvdt=rho2d(dvdt,naxis=0)
                 dvdt=cut_var(dvdt,lims)
     
             else:
-                print("let's not do that right now!!!")
+                print("let's not do offline_T right now!!!")
                 exit
     
     
@@ -301,6 +236,8 @@ if not loaded:
             w=w-w.mean()
     
             if salinity:
+                print("let's not do salinity right now!!!")
+                exit
                 T=nchis.variables['temp'][ithis,kchoice,:,:]
                 S=nchis.variables['salt'][ithis,kchoice,:,:]
                 #rho=rho_potential(T,S)
@@ -336,7 +273,7 @@ if not loaded:
                 vcor=rho2d(vcor,naxis=0)
                 vcor=cut_var(vcor,lims)
             else:
-                print("let's not do that right now!!!")
+                print("let's not do offline_Coriolis right now!!!")
                 exit
                 #dndx=np.zeros(pm.shape)
                 #dmde=np.zeros(pm.shape)
@@ -418,7 +355,8 @@ if not loaded:
                 (L,M)=u.shape # works for non squared grids
                 if window==1:
                     cff_tukey=0.25
-                    wdw1=tukeywin(L,cff_tukey)
+                    wdw1=tukeywin(L,-1.0)
+		    #wdw1=np.ones(L)
                     wdw2=tukeywin(M,cff_tukey)
                     print(wdw1.shape)
                     print(wdw2.shape)
@@ -429,7 +367,7 @@ if not loaded:
             print('shape 3 (%d,%d)',u.shape)
             
             if wind and kchoice==kchoicelist[0]:
-                print("let's not do that right now!!!")
+                print("let's not do WIND right now!!!")
                 exit
     #     # wind work only at the surface
     #     if mmean==1
@@ -451,26 +389,27 @@ if not loaded:
     # #  e_res=e_rate-(e_hadv+e_hdpr+e_zadv+e_zdis)
     #
             if mmean==1:
-                print("We should not be HERE right now!!!") # b and w already done
-    #     u=u-mean(mean(u))v=v-mean(mean(v))
-    #     advu1=advu1-mean(mean(advu1))
-    #     advv1=advv1-mean(mean(advv1))
-    #     advu2=advu2-mean(mean(advu2))
-    #     advv2=advv2-mean(mean(advv2))
-    #     dissu=dissu-mean(mean(dissu))
-    #     dissv=dissv-mean(mean(dissv))
-    #     dudt=dudt-mean(mean(dudt))
-    #     dvdt=dvdt-mean(mean(dvdt))
-    #     dxp=dxp-mean(mean(dxp))
-    #     dyp=dyp-mean(mean(dyp))
-    #     ukpp=ukpp-mean(mean(ukpp))
-    #     vkpp=vkpp-mean(mean(vkpp))
-    #     zadvu=zadvu-mean(mean(zadvu))
-    #     zadvv=zadvv-mean(mean(zadvv))
-    #     ucor=ucor-mean(mean(ucor))
-    #     vcor=vcor-mean(mean(vcor))
-    #     resu=resu-mean(mean(resu))
-    #     resv=resv-mean(mean(resv))
+                #print("We should not be HERE right now!!!") # b and w already done
+                u=u-u.mean()
+                v=v-v.mean()
+                #     advu1=advu1-mean(mean(advu1))
+                #     advv1=advv1-mean(mean(advv1))
+                advu2=advu2-advu2.mean()
+                advv2=advv2-advv2.mean()
+                dissu=dissu-dissu.mean()
+                dissv=dissv-dissv.mean()
+                dudt=dudt-dudt.mean()
+                dvdt=dvdt-dvdt.mean()
+                dxp=dxp-dxp.mean()
+                dyp=dyp-dyp.mean()
+                ukpp=ukpp-ukpp.mean()
+                vkpp=vkpp-vkpp.mean()
+                zadvu=zadvu-zadvu.mean()
+                zadvv=zadvv-zadvv.mean()
+                ucor=ucor-ucor.mean()
+                vcor=vcor-vcor.mean()
+                resu=resu-resu.mean()
+                resv=resv-resv.mean()
     #
             if window==1:
                 u=u*wdw
@@ -495,7 +434,7 @@ if not loaded:
                 resv=resv*wdw
                 b=b*wdw
                 w=w*wdw
-                print('u[0,0] %lf',u[0,0])
+                
     #
     #
             print('shape 4 (%d,%d)',u.shape)
@@ -527,8 +466,7 @@ if not loaded:
                 tmpamp9=np.zeros((L,M))
                 tmpamp10=np.zeros((L,M))
                 tmpamp22=np.zeros((L,M))
-                tmpamp12=np.zeros(L)
-                tmpamp13=np.zeros(L)
+                
     
     #
             print('shape 5 (%d,%d)',tmpamp0.max())
@@ -537,18 +475,6 @@ if not loaded:
             fcoefv=np.fft.fft2(v)
             tmpamp0=tmpamp0+cff1*np.real(np.conj(fcoefu)*fcoefu+np.conj(fcoefv)*fcoefv)        #  0  kinetic energy
     #
-            for i in range(M):
-                u1D=u[:,i]
-                v1D=v[:,i]
-                fcoefu1D=np.fft.fft(u1D)
-                fcoefv1D=np.fft.fft(v1D)
-                coef=(dz_klist[ik]/(sum(dz_klist)*L**2)).flatten()
-                tmpamp12=tmpamp12+coef*np.real(np.conj(fcoefu1D)*fcoefu1D+np.conj(fcoefv1D)*fcoefv1D) 
-            print('shape tmpamp12 (%d,%d)',tmpamp12.shape)
-            tmpamp12=tmpamp12/M
-            tmpamp13=tmpamp0.mean(axis=1)
-            print('shape tmpamp13 (%d,%d)',tmpamp13.shape)
-            
             fcoeftmpu=np.fft.fft2(advu1)
             fcoeftmpv=np.fft.fft2(advv1)
             tmpamp1=tmpamp1+cff1*np.real(np.conj(fcoefu)*fcoeftmpu+np.conj(fcoefv)*fcoeftmpv)   #  1  C4 horiz advection
@@ -630,8 +556,7 @@ if not loaded:
         tmpamp8=1./(it2-it1+1)*tmpamp8
         tmpamp9=1./(it2-it1+1)*tmpamp9
         tmpamp10=1./(it2-it1+1)*tmpamp10
-        tmpamp12=1./(it2-it1+1)*tmpamp12
-        tmpamp13=1./(it2-it1+1)*tmpamp13      
+
         
     # vertical loop
     print('tmpamp0 %lf',tmpamp0.mean())
@@ -657,8 +582,7 @@ if not loaded:
     tmpamp8=np.fft.fftshift(tmpamp8)
     tmpamp9=np.fft.fftshift(tmpamp9) 
     tmpamp10=np.fft.fftshift(tmpamp10)
-    tmpamp12=np.fft.fftshift(tmpamp12)
-    tmpamp13=np.fft.fftshift(tmpamp13)
+
     
     print('tmpamp0 %lf',tmpamp0.mean())
     print('tmpamp1 %lf',tmpamp1.mean())
@@ -672,7 +596,7 @@ if not loaded:
     print('tmpamp8 %lf',tmpamp8.mean())
     print('tmpamp9 %lf',tmpamp9.mean())
     print('tmpamp10 %lf',tmpamp10.mean())
-    print('tmpamp12 %lf',tmpamp12.mean())
+ 
     #
     ## get 1D spectra
     method=2
@@ -691,11 +615,7 @@ if not loaded:
     [amp10,count,ktmp,dk]=integ_fft2d(tmpamp10,dx)
     
     
-    #[amp12,count,ktmp,dk]=integ_fft1d(tmpamp12,dx)
-    #[amp13,count,ktmp,dk]=integ_fft1d(tmpamp13,dx)
-    #==============================================================================
-    # eval(['save SPECTRAL_KE_PK_2d_t' num2str(it1) '_to_t' num2str(it2) '.mat amp0 amp1 amp2 amp3 amp4 amp5 amp6 amp7 amp8 amp9 amp10 ktmp count kchoicelist'])
-    #
+
     if save:
         BDATA=[amp0,amp1,amp2,amp3,amp4,amp5,amp6,amp7,amp8,amp9,amp10,ktmp,count,kchoicelist]
         file1=open(filename,'w')

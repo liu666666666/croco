@@ -23,7 +23,26 @@ class gridinfo:
     def setId(self,idname):
         self.id=idname
 
+def get_zw(name):
+    grd=gridinfo()
+    grd.setId(name)
 
+    import pycomodo as pc
+    
+    nc=pc.Archive(grd.grdfile)
+    
+    hc=grd.hc
+    thetas=grd.thetas
+    thetab=grd.thetab
+    N=grd.N
+        
+    h=nc.variables.get('h')[0,0]
+    
+    from Preprocessing_tools import zlevs
+    
+    
+    zw=zlevs.zlevs(h,0,thetas,thetab,hc,N,'w')
+    return zw
 
 def cut_var(var,lims):
     '''

@@ -4,7 +4,7 @@ Created on Thu Apr 11 11:30:18 2013
 
 @author: soufflet
 
-program to plot 3D slices and an create animation.
+program to plot 3D slices and create an animation.
 
 """
 

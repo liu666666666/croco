@@ -10,6 +10,8 @@ coef=number1*10.**expon
 print expon,coef
 #cff_scale=10.**4
 strexpon=str(expon)
+save=False
+
 
 for pref in ['5K','10K','20K']:
     resol=pref
@@ -21,7 +23,7 @@ for pref in ['5K','10K','20K']:
     istr=0
     print(' amp0 rebuilt = %lf ',sum(amp0[istr:]))
     A=[]
-
+    pressure3D=amp5-amp9
     # # PLOT
     # #
     #
@@ -33,25 +35,28 @@ for pref in ['5K','10K','20K']:
     K=ktmp[istr:]
     LK=K.shape[0]
 
-    A +=[cff_scale*amp0[istr:]/dk]
-    A+=[cff_scale*amp2[istr:]/dk]
-    A+=[cff_scale*amp3[istr:]/dk]
-    A+=[cff_scale*amp4[istr:]/dk]
-    A+=[cff_scale*amp5[istr:]/dk]
-    A+=[cff_scale*amp6[istr:]/dk]
-    A+=[cff_scale*amp7[istr:]/dk]
-    A+=[cff_scale*amp8[istr:]/dk]
-    A+=[cff_scale*amp9[istr:]/dk]
-    A+=[cff_scale*amp10[istr:]/dk]
+    A +=[cff_scale*amp0[istr:]/dk] #0
+    A+=[cff_scale*amp2[istr:]/dk]  #1
+    A+=[cff_scale*amp3[istr:]/dk]  #2
+    A+=[cff_scale*amp4[istr:]/dk]  #3
+    A+=[cff_scale*amp5[istr:]/dk]  #4
+    A+=[cff_scale*amp6[istr:]/dk]  #5
+    A+=[cff_scale*amp7[istr:]/dk]  #6
+    A+=[cff_scale*amp8[istr:]/dk]  #7
+    A+=[cff_scale*amp9[istr:]/dk]  #8
+    A+=[cff_scale*amp10[istr:]/dk] #9
+    
     amp11=amp4-(amp2+amp3+amp5+amp6+amp7+amp10)
-    A+=[cff_scale*amp11[istr:]/dk]
-
+    A+=[cff_scale*amp11[istr:]/dk] #10
+    A+=[cff_scale*pressure3D[istr:]/dk] #11
+    
     fig=p.figure()
     a=fig.add_subplot(1,1,1)
     a.plot(K,A[2],'b',label='horizontal diffusion')
     a.plot(K,A[1],'g',label='horizontal advection')
     a.plot(K,A[3],'r',label=r'$\frac{\partial{u}}{\partial{t}}$')
-    a.plot(K,A[4],'c',label='P')
+    a.plot(K,A[11],'c',label='P3D')
+    a.plot(K,A[8],'c--',label='Baroclinic conversion')
     a.plot(K,A[5],'b--',label='vertical diffusion',)
     a.plot(K,A[6],'g--',label='vertical advection')
     a.plot(K,A[9],'r--',label='Coriolis')
@@ -59,8 +64,7 @@ for pref in ['5K','10K','20K']:
     a.legend()
     pic1name=resol+'budget'
     fig.suptitle(resol+' spectral budget')
-    fig.savefig(pic1name)
-
+    
     fig2=p.figure()
     a2=fig2.add_subplot(1,1,1)
     a2.plot(K,A[7],'c--',label='Residual')
@@ -72,14 +76,12 @@ for pref in ['5K','10K','20K']:
     a2.set_ylabel('KE Tendencies [$10^{'+strexpon+'} m^3/s^3$]')
     pic2name=resol+'residual'
     fig2.suptitle(resol+' residual_pt')
-    fig2.savefig(pic2name)
-
+    
     fig3=p.figure()
     a3=fig3.add_subplot(1,1,1)
     a3.set_xlabel('k [rad/m]')
     a3.set_ylabel('KE Tendencies [$10^{'+strexpon+'} m^3/s^3$]')
     pic3name=resol+'KEslope'
-
 
     a3.plot(K,amp0/dk,label=pref)
 
@@ -91,7 +93,12 @@ for pref in ['5K','10K','20K']:
     a3.set_xlabel('Wavenumber k [rad/m]')
     a3.set_title('KE spectrum')
     a3.legend()
-    fig3.savefig(pic3name)
+    
+    if save:
+        fig3.savefig(pic3name)
+        fig2.savefig(pic2name)
+        fig.savefig(pic1name)
+        
 p.show()
 
 
