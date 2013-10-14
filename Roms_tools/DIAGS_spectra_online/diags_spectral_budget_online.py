@@ -4,15 +4,11 @@ import pylab as p
     
 import pycomodo as pc
 
-from utilities import extend_torhoshape, tukeywin,integ_fft2d, get_zw_fromnc, horizontal_advection_C4
+from utilities import rho2d_xperiodic1,extend_torhoshape, tukeywin,integ_fft2d, get_zw_fromnc, horizontal_advection_C4
 
 
 def compute_budget(resol,depth_integration,tlength):
-    ''' Compute spectral budget
-
-
-
-        * Setting main parameters of for the calculation:
+    ''' Setting main parameters of for the calculation:
         * if mean =1 , we remove the mean of each variable and use the fluctuation instead u'=u-ubar 
         * window =1 we use windowing (useful for non-periodic solution)
         * cff_tukey=1, if windowing is used, uses the Tukey method
@@ -29,30 +25,15 @@ def compute_budget(resol,depth_integration,tlength):
     ''' Path of the output files, resolution, box set, vertical level list, iterations... '''
     #resol='5K'
     nres=resol.split('K')[0]
-    ###WATCH OUT dx is obtained from the prefix name
-    ###this is dangerous, we should get it from the nc file
     dx=float(nres)*1000
     Nx=int(500000/dx)
     Ny=int(2000000/dx)
 
-    lims=[0,Nx,0,Ny] #This is not used for global budget
-
-    '''Hard coded path and filename convention'''
-
+    lims=[0,Nx,0,Ny]
     #root='/data/models/JET/Last3Months/'+resol #+'JET/'
-    root='/data/models/JET/'+resol+'JET/'#+resol
-    #model='jet_last3months'
-    model='jet'#_100Days'
-    historyfilename=root+model+'_his.nc'
-    print historyfilename
-
-    print('reading netcdf file: ',historyfilename)
-    nchis=pc.Archive(historyfilename)
-
-    diagfilename =root+model+'_diaM.nc'
-    print diagfilename
-    print('reading netcdf file: ',diagfilename) 
-    ncdiags=pc.Archive(diagfilename)
+    root='/data/models/JET/LastYear/'+resol#+'JET/AsselinFrom18M/'#+resol
+    model='jet_Lastyear'
+    #model='jet'#_100Days'
 
     '''physical constants and plotting parameters'''
 
@@ -64,13 +45,17 @@ def compute_budget(resol,depth_integration,tlength):
     ymin=-1
     ymax=1  # limits for plots
 
+    historyfilename=root+model+'_avg.nc'
+    print historyfilename
 
+    print('reading netcdf file: %s',historyfilename)
+    nchis=pc.Archive(historyfilename)
         
     #overload grid_info function
     zw=get_zw_fromnc(nchis).squeeze()
     N=zw.shape[0]-1
     zlayers=0.5*(zw[:-1]+zw[1:])
-    level=np.argmin(np.abs(zlayers+depth_integration)) #get the closest level from specified depth
+    level=np.argmin(np.abs(zlayers+depth_integration))
     kchoicelist=range(N)[level:]
     kchoice=level
     print('Integrating from depth: ',zlayers[kchoice])
@@ -80,14 +65,15 @@ def compute_budget(resol,depth_integration,tlength):
     dz=dz[kchoicelist]
     depthmax=int(zlayers[kchoice])
     
-    ###suffix is appended to the output file names
-    suffixe='_at'+str(depthmax)+'m_fromday_'+str(tlength)
-    
-    ###if the integration has already been done
-    ### we can read the pickle file to plot the budget and slope without
-    ### recomputing everything 
-    ### (this should disappear soon)
+    timevar=nchis.variables['time']
+    totaliterations=timevar.shape[0]
+    #it2=totaliterations-tlength-1
+    #it1=totaliterations-tlength-120
+    it2=totaliterations-1
+    it1=totaliterations-tlength
 
+    suffixe='_averaged_at'+str(depthmax)+'m_fromday_'+str(tlength)
+    
     #loaded=True
     #save=False
     #
@@ -97,7 +83,7 @@ def compute_budget(resol,depth_integration,tlength):
     filename=resol+'JET'+suffixe+'.pck'
 
 
-    ''' Different momentum terms are already computed, online=1, and read from the diag file'''
+    ''' Different terms are already computed, online=1, or needs to be calculated'''
     online_T=1
     online_P=1
     online_Cor=1
@@ -105,22 +91,28 @@ def compute_budget(resol,depth_integration,tlength):
 
     nlevels=len(kchoicelist)
 
-    timevar=nchis.variables['time']
-    totaliterations=timevar.shape[0]
-    it2=totaliterations-1
-    it1=it2-tlength
     
-    #tlength=it2-it1
-
+    
+    
+    tlength=it2-it1+1
+    print ("iterations:",it1,it2,tlength)
     if not loaded:
         
+        diagfilename =root+model+'_diaM_avg.nc'
+        srhoshape=nchis.variables['s_rho'].shape
+        print diagfilename
+        print("srho shape:",srhoshape)
+        print('reading netcdf file: %s',diagfilename) 
+        ncdiags=pc.Archive(diagfilename)
+
+        print('domain limits: ',lims) 
+
         U=nchis.variables['u']
         V=nchis.variables['v']
         pm=nchis.variables['pm']
         pn=nchis.variables['pn']
         (Mu,Lu)=U.shape[-2:]
         (Mv,Lv)=V.shape[-2:]
-        '''might be better to get rho grid dimension directly'''
         M=Mu
         L=Lv
 
@@ -137,7 +129,7 @@ def compute_budget(resol,depth_integration,tlength):
         e_res=0
         e_wb=0
 
-        print("initialisation of spectrum var area")
+        print("initialisation des var de calcul de spectre")
 
         tmpamp0=np.zeros((M,L))
         tmpamp1=np.zeros((M,L))
@@ -193,13 +185,13 @@ def compute_budget(resol,depth_integration,tlength):
                 In ROMS history files contain initialisation fields (t=0) 
                 so start to read from iteration number 1
                 '''
-                ithis=it+1
+                ithis=it#+1
 
                 print('Treating rec #d',it)
                 timehis=nchis.variables['scrum_time'][ithis]
                 timediaM=ncdiags.variables['scrum_time'][it]
-                print('which, in his file, correspond to %d:', int(timehis))
-                print('which, in diaM file, correspond to %d:', int(timediaM))
+                print('which, in his file, correspond to: ', int(timehis))
+                print('which, in diaM file, correspond to: ', int(timediaM))
 
                 levelhis=nchis.variables['s_rho'][kchoice]
                 leveldiaM=ncdiags.variables['s_rho'][kchoice]
@@ -215,10 +207,8 @@ def compute_budget(resol,depth_integration,tlength):
 #                C4_hadvection_u[it,ik,:,:]=advu1
 #                C4_hadvection_v[it,ik,:,:]=advv1
 
-
-                '''No interpolation is done but variables are extended to rho-grid dimension (+1pt) '''
-                u=extend_torhoshape(u)
-                v=extend_torhoshape(v,naxis=0)
+                u=rho2d_xperiodic1(u)
+                v=rho2d_xperiodic1(v,naxis=0)
 
         #### UPSTREAM BIASED NL TERMS ####
         #### computed as if in the rhs (- sign already included).
@@ -235,8 +225,8 @@ def compute_budget(resol,depth_integration,tlength):
                 advv2[:,0]= advv2[:,-2]
                 advv2[:,-1]= advv2[:,1]
 
-                advu2=extend_torhoshape(advu2)
-                advv2=extend_torhoshape(advv2,naxis=0)
+                advu2=rho2d_xperiodic1(advu2)
+                advv2=rho2d_xperiodic1(advv2,naxis=0)
  
                 advu1=advu2
                 advv1=advv2
@@ -276,8 +266,8 @@ def compute_budget(resol,depth_integration,tlength):
                     dvdt[:,0]= dvdt[:,-2]
                     dvdt[:,-1]= dvdt[:,1]
 
-                    dudt=extend_torhoshape(dudt)
-                    dvdt=extend_torhoshape(dvdt,naxis=0)
+                    dudt=rho2d_xperiodic1(dudt)
+                    dvdt=rho2d_xperiodic1(dvdt,naxis=0)
                 else:
                     print("let's not do offline_T right now!!!")
                     exit
@@ -311,8 +301,8 @@ def compute_budget(resol,depth_integration,tlength):
                     dxp[:,-1]= dxp[:,0]
                     dyp[:,0]=dyp[:,-2]
                     dyp[:,-1]=dyp[:,1]
-                    dxp=extend_torhoshape(dxp)
-                    dyp=extend_torhoshape(dyp,naxis=0)
+                    dxp=rho2d_xperiodic1(dxp)
+                    dyp=rho2d_xperiodic1(dyp,naxis=0)
                 else:
                     print("let's not do that right now!!!")
                     exit
@@ -327,8 +317,8 @@ def compute_budget(resol,depth_integration,tlength):
                     vcor[:,0]= vcor[:,-2]
                     vcor[:,-1]= vcor[:,1]
 
-                    ucor=extend_torhoshape(ucor)
-                    vcor=extend_torhoshape(vcor,naxis=0)
+                    ucor=rho2d_xperiodic1(ucor)
+                    vcor=rho2d_xperiodic1(vcor,naxis=0)
                 else:
                     print("let's not do offline_Coriolis right now!!!")
                     exit
@@ -341,8 +331,8 @@ def compute_budget(resol,depth_integration,tlength):
                     vkpp[:,0]= vkpp[:,-2]
                     vkpp[:,-1]= vkpp[:,1]
                    
-                    ukpp=extend_torhoshape(ukpp)
-                    vkpp=extend_torhoshape(vkpp,naxis=0)
+                    ukpp=rho2d_xperiodic1(ukpp)
+                    vkpp=rho2d_xperiodic1(vkpp,naxis=0)
 
                 else:
                     print("let's not do that right now!!!")
@@ -356,8 +346,8 @@ def compute_budget(resol,depth_integration,tlength):
                 zadvv[:,0]= zadvv[:,-2]
                 zadvv[:,-1]= zadvv[:,1]
 
-                zadvu=extend_torhoshape(zadvu)
-                zadvv=extend_torhoshape(zadvv,naxis=0)
+                zadvu=rho2d_xperiodic1(zadvu)
+                zadvv=rho2d_xperiodic1(zadvv,naxis=0)
         #
         # #### residual
                 resu=-ncdiags.variables['u_rate'][it,kchoice,:,:]+\
@@ -384,8 +374,8 @@ def compute_budget(resol,depth_integration,tlength):
                 resv[:,0]= resv[:,-2]
                 resv[:,-1]= resv[:,1]
 
-                resu=extend_torhoshape(resu)
-                resv=extend_torhoshape(resv,naxis=0)
+                resu=rho2d_xperiodic1(resu)
+                resv=rho2d_xperiodic1(resv,naxis=0)
           
                 if wind and kchoice==kchoicelist[0]:
                     print("let's not do WIND right now!!!")
@@ -456,8 +446,8 @@ def compute_budget(resol,depth_integration,tlength):
         
 
 
-        #Co-spectra are calculated here
-                
+        #
+                #print('shape 5 (%d,%d)',tmpamp0.max())
                 cff=1./((L*M)**2)
                 cff1=cff*dz_klist[ik]/sum(dz_klist)/tlength
                 fcoefu=np.fft.fft2(u)
@@ -532,8 +522,7 @@ def compute_budget(resol,depth_integration,tlength):
         print('tmpamp8 ',tmpamp8.mean())
         print('tmpamp9 ',tmpamp9.mean())
         print('tmpamp10 ',tmpamp10.mean())
-        
-        # Reorder fft coefficient around 0
+   
         tmpamp0=np.fft.fftshift(tmpamp0)
         tmpamp1=np.fft.fftshift(tmpamp1) 
         tmpamp2=np.fft.fftshift(tmpamp2)
@@ -548,7 +537,7 @@ def compute_budget(resol,depth_integration,tlength):
 
         #
         ## get 1D spectra
-        ## Do the circle integration (dx is used here!)
+        print('Sum de tmpamp0 (TKE):',tmpamp0.sum())
         [amp0,count,ktmp,dk]=integ_fft2d(tmpamp0,dx)
         [amp1,count,ktmp,dk]=integ_fft2d(tmpamp1,dx)
         [amp2,count,ktmp,dk]=integ_fft2d(tmpamp2,dx)
@@ -605,7 +594,12 @@ def compute_budget(resol,depth_integration,tlength):
     A=[]
     
     cff_scale=1.0
-        
+    number1=cff_scale
+
+    from math import log10 
+    expon=-int(np.floor(log10(abs(number1))))
+    coef=number1*10.**expon
+
     A+=[cff_scale*amp1[istr:]/dk[:]]
     A+=[cff_scale*amp2[istr:]/dk[:]]
     A+=[cff_scale*amp3[istr:]/dk[:]]

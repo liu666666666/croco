@@ -138,6 +138,24 @@ def rho2d_xperiodic1(var,naxis=1):
     else:
         u2rho[0,:]=u2rho[1,:]
         u2rho[-1,:]=u2rho[-2,:]
+    return u2rho.swapaxes(0,naxis)
+
+def rho2d_xperiodic1_old(var,naxis=1):
+    '''interpolate var onto a mid-cell grid (rho-grid)
+    area is extended over one axis
+    This has been written for the jet case and preserve periodicity in x-dimension(Xsi)
+    '''
+    keep_periodicity=naxis
+    u=var.swapaxes(0,naxis)
+    (M,P)=u.shape
+    u2rho=np.zeros((M+1,P))
+    u2rho[1:-1,:]=0.5*(u[:-1,:]+u[1:,:])
+    if keep_periodicity:
+        u2rho[0,:]=u2rho[-2,:]
+        u2rho[-1,:]=u2rho[1,:]
+    else:
+        u2rho[0,:]=u2rho[1,:]
+        u2rho[-1,:]=u2rho[-2,:]
     return u2rho.swapaxes(0,naxis).transpose()
 
 def rho2d_xperiodic2(var,naxis=1):
