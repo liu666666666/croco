@@ -1,4 +1,4 @@
-function  create_grid2(L,M,grdname,title)
+function  create_grid(L,M,grdname,title)
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %
 % 	Create an empty netcdf gridfile
@@ -281,4 +281,4 @@ nw.date = date;
 nw.type = ncchar('ROMS grid file');
 nw.type = 'ROMS grid file';
 
-result = close(nw);
+close(nw);
