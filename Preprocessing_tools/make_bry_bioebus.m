@@ -89,27 +89,27 @@ disp([' Title: ',ROMS_title])
 %
 disp(' ')
 disp(' Read in the grid...')
-nc=netcdf(grdname);
+nc=netcdf(grdname,'r');
 lon=nc{'lon_rho'}(:);
 lat=nc{'lat_rho'}(:);
 Lp=length(nc('xi_rho'));
 Mp=length(nc('eta_rho'));
 hmax=max(max(nc{'h'}(:)));
-result=close(nc);
+close(nc);
 % %
 %Get the time of data
 %
-nc=netcdf(no3_seas_data);
+nc=netcdf(no3_seas_data,'r');
 time_no3=nc{'T'}(:);
 close(nc)
 time_no3=(time_no3)*30;
 %
-nc=netcdf(o2_seas_data);
+nc=netcdf(o2_seas_data,'r');
 time_o2=nc{'T'}(:);
 close(nc)
 time_o2=(time_o2)*30;
 %
-nc=netcdf(chla_seas_data);
+nc=netcdf(chla_seas_data,'r');
 time_chla=nc{'T'}(:);
 close(nc)
 time_chla=(time_chla)*30;
@@ -139,7 +139,7 @@ if (makeZbry)
 %
 % get Z
 %
-  nc=netcdf(no3_ann_data);
+    nc=netcdf(no3_ann_data,'r');
   Z=nc{'Z'}(:);
   kmax=max(find(Z<hmax))-1;
   Z=Z(1:kmax);

@@ -111,6 +111,7 @@ ext_tracers_ini(ininame,grdname,fer_month_data,fer_ann_data,...
 %
 % Make a few plots
 %
+if (makeplot)
 disp(' ')
 disp(' Make a few plots...')
 test_clim(ininame,grdname,'NO3',1,coastfileplot)
@@ -128,6 +129,7 @@ figure
 test_clim(ininame,grdname,'DOC',1,coastfileplot)
 figure
 test_clim(ininame,grdname,'FER',1,coastfileplot)
+end %if makeplot
 
 end %if makeini
 %

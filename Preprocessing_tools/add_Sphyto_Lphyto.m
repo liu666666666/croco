@@ -51,7 +51,7 @@ time= nc{'chla_time'}(:);
 cycle= nc{'chla_time'}.cycle_length(:);
 tlen=length(time);
 %
-redef(nc);
+%%redef(nc);
 %
 nc('sphyto_time') = tlen;
 nc{'sphyto_time'} = ncdouble('sphyto_time') ;
@@ -91,7 +91,7 @@ nc{'LPHYTO'}.units = 'mMol N m-3';
 nc{'LPHYTO'}.fields = ncchar('LPHYTO, scalar, series');
 nc{'LPHYTO'}.fields = 'LPHYTO, scalar, series';
 %
-endef(nc);
+%%endef(nc);
 %
 % record the time
 %

@@ -106,7 +106,7 @@ disp(ROMS_title)
 %
 disp(' ')
 disp(' Read in the grid...')
-nc=netcdf(grdname);
+nc=netcdf(grdname,'r');
 Lp=length(nc('xi_rho'));
 Mp=length(nc('eta_rho'));
 lon=nc{'lon_rho'}(:);
@@ -116,7 +116,7 @@ latu=nc{'lat_u'}(:);
 lonv=nc{'lon_v'}(:);
 latv=nc{'lat_v'}(:);
 angle=nc{'angle'}(:);
-result=close(nc);
+close(nc);
 cosa=cos(angle);
 sina=sin(angle);
 %
@@ -187,7 +187,8 @@ end
 % Compute wind stress rotated and at u,v points
 %
 for tindex=1:length(coads_time)
-  time=nc{'sms_time'}(tindex);
+%  time=nc{'sms_time'}(tindex);
+  time=nc{'bulk_time'}(tindex);
   tx=ext_data(taux_file,taux_name,tindex,...
              lon,lat,time,Roa,2);
   ty=ext_data(tauy_file,tauy_name,tindex,...
